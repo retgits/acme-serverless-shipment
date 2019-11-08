@@ -1,0 +1,132 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  The Shipment service is part of the ACME Serverless Shop. The goal of this specific service is, as the name implies, to ship products using a wide variety of shipping suppliers.
+
+Globals:
+  Function:
+    Timeout: 5
+
+Parameters:
+  Version:
+    Type: String
+  User:
+    Type: String
+  Team:
+    Type: String
+  Feature:
+    Type: String
+    Default: acmeserverless
+  Stage:
+    Type: String
+    Default: dev
+  WavefrontURL:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /dev/acmeserverless/wavefront/url
+  WavefrontToken:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /dev/acmeserverless/wavefront/token
+  ShipmentInboundQueue:
+    Type: String
+    Default: shipment-inboundqueue
+  ShipmentOutboundQueue:
+    Type: String
+    Default: shipment-outboundqueue
+
+Resources:
+  SIQueueParam:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: !Sub '/${Stage}/${Feature}/shipment/${ShipmentInboundQueue}'
+      Type: "String"
+      Value: !Ref ShipmentInboundQueue
+      Description: "The name of the inbound queue for the Shipment service."
+      Tags: 
+        "version": !Ref Version
+        "author": !Ref User
+        "team": !Ref Team
+        "feature": !Ref Feature
+        "region": !Ref AWS::Region
+  SOQueueParam:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: !Sub '/${Stage}/${Feature}/shipment/${ShipmentOutboundQueue}'
+      Type: "String"
+      Value: !Ref ShipmentOutboundQueue
+      Description: "The name of the outbound queue for the Shipment service."
+      Tags: 
+        "version": !Ref Version
+        "author": !Ref User
+        "team": !Ref Team
+        "feature": !Ref Feature
+        "region": !Ref AWS::Region
+  SIQueue:
+    Type: AWS::SQS::Queue
+    Properties: 
+      MessageRetentionPeriod: 120
+      QueueName: !Ref ShipmentInboundQueue
+      Tags: 
+        - Key: version
+          Value: !Ref Version
+        - Key: author
+          Value: !Ref User
+        - Key: team
+          Value: !Ref Team
+        - Key: feature
+          Value: !Ref Feature
+        - Key: region
+          Value: !Ref AWS::Region
+      VisibilityTimeout: 30
+  SOQueue:
+    Type: AWS::SQS::Queue
+    Properties: 
+      MessageRetentionPeriod: 120
+      QueueName: !Ref ShipmentOutboundQueue
+      Tags: 
+        - Key: version
+          Value: !Ref Version
+        - Key: author
+          Value: !Ref User
+        - Key: team
+          Value: !Ref Team
+        - Key: feature
+          Value: !Ref Feature
+        - Key: region
+          Value: !Ref AWS::Region
+      VisibilityTimeout: 30
+  Shipment:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: shipment
+      Runtime: go1.x
+      CodeUri: bin/
+      FunctionName: Shipment
+      Description: A Lambda function to handle shipments
+      MemorySize: 256
+      Timeout: 10
+      Policies:
+        - AWSLambdaRole
+        - AWSLambdaSQSQueueExecutionRole
+        - SQSSendMessagePolicy:
+            QueueName: !Ref ShipmentOutboundQueue
+      Environment:
+        Variables:
+          REGION: !Ref AWS::Region
+          RESPONSE_QUEUE: !Ref SOQueue
+          WAVEFRONT_ENABLED: true
+          WAVEFRONT_URL: !Ref WavefrontURL
+          WAVEFRONT_API_TOKEN: !Ref WavefrontToken
+      Events:
+        ValidateCreditcard:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt SIQueue.Arn
+            BatchSize: 1
+            Enabled: true
+      Tags:
+        version: !Ref Version
+        author: !Ref User
+        team: !Ref Team
+        feature: !Ref Feature
+        region: !Ref AWS::Region
+      VersionDescription: !Ref Version

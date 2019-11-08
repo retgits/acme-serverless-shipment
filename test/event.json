@@ -1,0 +1,20 @@
+{
+    "Records": [
+        {
+            "messageId": "19dd0b57-b21e-4ac1-bd88-01bbb068cb78",
+            "receiptHandle": "MessageReceiptHandle",
+            "body": "{\"userid\": \"8888\", \"firstname\": \"John\", \"lastname\": \"Blaze\", \"address\": { \"street\": \"20 Riding Lane Av\", \"city\": \"San Francisco\", \"zip\": \"10201\", \"state\": \"CA\", \"country\": \"USA\" }, \"email\": \"jblaze@marvel.com\", \"delivery\": \"UPS/FEDEX\", \"card\": { \"type\": \"amex/visa/mastercard/bahubali\", \"number\": \"34983479798\", \"expMonth\": \"12\", \"expYear\": \"21\", \"ccv\": \"123\" }, \"cart\": [ { \"id\": \"1234\", \"description\": \"redpants\", \"quantity\": \"1\", \"price\": \"4\" }, { \"id\": \"5678\", \"description\": \"bluepants\", \"quantity\": \"1\", \"price\": \"4\" } ], \"total\": \"100\"}",
+            "attributes": {
+                "ApproximateReceiveCount": "1",
+                "SentTimestamp": "1523232000000",
+                "SenderId": "123456789012",
+                "ApproximateFirstReceiveTimestamp": "1523232000001"
+            },
+            "messageAttributes": {},
+            "md5OfBody": "7b270e59b47ff90a553787216d55d91d",
+            "eventSource": "aws:sqs",
+            "eventSourceARN": "arn:aws:sqs:us-east-1:123456789012:MyQueue",
+            "awsRegion": "us-east-1"
+        }
+    ]
+}
