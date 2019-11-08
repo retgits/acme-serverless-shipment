@@ -103,7 +103,7 @@ Resources:
       FunctionName: Shipment
       Description: A Lambda function to handle shipments
       MemorySize: 256
-      Timeout: 10
+      Timeout: 130
       Policies:
         - AWSLambdaRole
         - AWSLambdaSQSQueueExecutionRole
