@@ -130,3 +130,14 @@ Resources:
         feature: !Ref Feature
         region: !Ref AWS::Region
       VersionDescription: !Ref Version
+
+Outputs:
+  ShipmentARN:
+    Description: ARN for the Shipment function
+    Value: !GetAtt Shipment.Arn
+  SOQueueARN:
+    Description: ARN for the Shipment Outbound Queue
+    Value: !GetAtt SOQueue.Arn
+  SIQueueARN:
+    Description: ARN for the Shipment Inbound Queue
+    Value: !GetAtt SIQueue.Arn
