@@ -45,7 +45,7 @@ Resources:
           Value: !Ref Feature
         - Key: region
           Value: !Ref AWS::Region
-      VisibilityTimeout: 30
+      VisibilityTimeout: 240
   ShipmentOutboundQueue:
     Type: AWS::SQS::Queue
     Properties: 
@@ -65,7 +65,7 @@ Resources:
           Value: !Ref Feature
         - Key: region
           Value: !Ref AWS::Region
-      VisibilityTimeout: 30
+      VisibilityTimeout: 240
   ShipmentInboundDeadLetterQueue:
     Type: AWS::SQS::Queue
     Properties: 
@@ -82,7 +82,7 @@ Resources:
           Value: !Ref Feature
         - Key: region
           Value: !Ref AWS::Region
-      VisibilityTimeout: 30
+      VisibilityTimeout: 240
   ShipmentOutboundDeadLetterQueue:
     Type: AWS::SQS::Queue
     Properties: 
@@ -99,7 +99,7 @@ Resources:
           Value: !Ref Feature
         - Key: region
           Value: !Ref AWS::Region
-      VisibilityTimeout: 30
+      VisibilityTimeout: 240
   Shipment:
     Type: AWS::Serverless::Function
     Properties:
