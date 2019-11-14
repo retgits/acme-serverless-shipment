@@ -21,52 +21,18 @@ Parameters:
     Type: String
     Default: dev
   WavefrontURL:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /dev/acmeserverless/wavefront/url
+    Type: String
   WavefrontToken:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /dev/acmeserverless/wavefront/token
-  ShipmentInboundQueue:
     Type: String
-    Default: shipment-inboundqueue
-  ShipmentOutboundQueue:
-    Type: String
-    Default: shipment-outboundqueue
 
 Resources:
-  SIQueueParam:
-    Type: "AWS::SSM::Parameter"
-    Properties:
-      Name: !Sub '/${Stage}/${Feature}/shipment/${ShipmentInboundQueue}'
-      Type: "String"
-      Value: !Ref ShipmentInboundQueue
-      Description: "The name of the inbound queue for the Shipment service."
-      Tags: 
-        "version": !Ref Version
-        "author": !Ref User
-        "team": !Ref Team
-        "feature": !Ref Feature
-        "region": !Ref AWS::Region
-  SOQueueParam:
-    Type: "AWS::SSM::Parameter"
-    Properties:
-      Name: !Sub '/${Stage}/${Feature}/shipment/${ShipmentOutboundQueue}'
-      Type: "String"
-      Value: !Ref ShipmentOutboundQueue
-      Description: "The name of the outbound queue for the Shipment service."
-      Tags: 
-        "version": !Ref Version
-        "author": !Ref User
-        "team": !Ref Team
-        "feature": !Ref Feature
-        "region": !Ref AWS::Region
-  SIQueue:
+  ShipmentInboundQueue:
     Type: AWS::SQS::Queue
     Properties: 
       MessageRetentionPeriod: 120
-      QueueName: !Ref ShipmentInboundQueue
+      QueueName: !Sub '${Stage}-${Feature}-shipment-inbound'
       RedrivePolicy:
-        deadLetterTargetArn: !GetAtt SDLQueue.Arn
+        deadLetterTargetArn: !GetAtt ShipmentInboundDeadLetterQueue.Arn
         maxReceiveCount: 1
       Tags: 
         - Key: version
@@ -80,13 +46,13 @@ Resources:
         - Key: region
           Value: !Ref AWS::Region
       VisibilityTimeout: 30
-  SOQueue:
+  ShipmentOutboundQueue:
     Type: AWS::SQS::Queue
     Properties: 
       MessageRetentionPeriod: 120
-      QueueName: !Ref ShipmentOutboundQueue
+      QueueName: !Sub '${Stage}-${Feature}-shipment-outbound'
       RedrivePolicy:
-        deadLetterTargetArn: !GetAtt SDLQueue.Arn
+        deadLetterTargetArn: !GetAtt ShipmentOutboundDeadLetterQueue.Arn
         maxReceiveCount: 1
       Tags: 
         - Key: version
@@ -100,11 +66,28 @@ Resources:
         - Key: region
           Value: !Ref AWS::Region
       VisibilityTimeout: 30
-  SDLQueue:
+  ShipmentInboundDeadLetterQueue:
     Type: AWS::SQS::Queue
     Properties: 
       MessageRetentionPeriod: 120
-      QueueName: shipment-dlq
+      QueueName: !Sub '${Stage}-${Feature}-shipment-inbound-dlq'
+      Tags: 
+        - Key: version
+          Value: !Ref Version
+        - Key: author
+          Value: !Ref User
+        - Key: team
+          Value: !Ref Team
+        - Key: feature
+          Value: !Ref Feature
+        - Key: region
+          Value: !Ref AWS::Region
+      VisibilityTimeout: 30
+  ShipmentOutboundDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties: 
+      MessageRetentionPeriod: 120
+      QueueName: !Sub '${Stage}-${Feature}-shipment-outbound-dlq'
       Tags: 
         - Key: version
           Value: !Ref Version
@@ -131,11 +114,11 @@ Resources:
         - AWSLambdaRole
         - AWSLambdaSQSQueueExecutionRole
         - SQSSendMessagePolicy:
-            QueueName: !Ref ShipmentOutboundQueue
+            QueueName: !Sub '${Stage}-${Feature}-shipment-outbound'
       Environment:
         Variables:
           REGION: !Ref AWS::Region
-          RESPONSE_QUEUE: !Ref SOQueue
+          RESPONSE_QUEUE: !Ref ShipmentOutboundQueue
           WAVEFRONT_ENABLED: true
           WAVEFRONT_URL: !Ref WavefrontURL
           WAVEFRONT_API_TOKEN: !Ref WavefrontToken
@@ -143,7 +126,7 @@ Resources:
         ValidateCreditcard:
           Type: SQS
           Properties:
-            Queue: !GetAtt SIQueue.Arn
+            Queue: !GetAtt ShipmentInboundQueue.Arn
             BatchSize: 1
             Enabled: true
       Tags:
@@ -155,12 +138,18 @@ Resources:
       VersionDescription: !Ref Version
 
 Outputs:
-  ShipmentARN:
+  ShipmentsARN:
     Description: ARN for the Shipment function
     Value: !GetAtt Shipment.Arn
-  SOQueueARN:
-    Description: ARN for the Shipment Outbound Queue
-    Value: !GetAtt SOQueue.Arn
-  SIQueueARN:
+  ShipmentInboundQueueARN:
     Description: ARN for the Shipment Inbound Queue
-    Value: !GetAtt SIQueue.Arn
+    Value: !GetAtt ShipmentInboundQueue.Arn
+  ShipmentOutboundQueueARN:
+    Description: ARN for the Shipment Outbound Queue
+    Value: !GetAtt ShipmentOutboundQueue.Arn
+  ShipmentInboundDeadLetterQueueARN:
+    Description: ARN for the Shipment Inbound DeadLetter Queue
+    Value: !GetAtt ShipmentInboundDeadLetterQueue.Arn
+  ShipmentOutboundDeadLetterQueueARN:
+    Description: ARN for the Shipment Outbound DeadLetter Queue
+    Value: !GetAtt ShipmentOutboundDeadLetterQueue.Arn
