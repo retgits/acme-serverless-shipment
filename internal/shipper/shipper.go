@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"github.com/retgits/shipment"
+	"github.com/retgits/shipment/internal/emitter"
 )
 
 const (
@@ -13,27 +15,23 @@ const (
 	maxDeliveryTime = 120
 )
 
-func Send(message string) (*Shipment, error) {
-	msg, err := unmarshalOrder([]byte(message))
-	if err != nil {
-		log.Printf("error unmarshaling request: %s", err.Error())
-		return nil, err
-	}
-
-	log.Printf("Hello, this is %s... We'll take care of your package!", msg.Delivery)
+// Sent ...
+func Sent(r shipment.Request) emitter.Data {
+	log.Printf("Hello, this is %s... We'll take care of your package!", r.Delivery)
 
 	trackingnumber := uuid.Must(uuid.NewV4()).String()
 
-	res := &Shipment{
+	res := emitter.Data{
 		TrackingNumber: trackingnumber,
-		OrderNumber:    msg.OrderID,
+		OrderNumber:    r.OrderID,
 		Status:         "shipped - pending delivery",
 	}
 
-	return res, err
+	return res
 }
 
-func Delivered(s *Shipment) (string, error) {
+// Delivered ...
+func Delivered(s emitter.Data) emitter.Data {
 	d := deliveryTime(minDeliveryTime, maxDeliveryTime)
 	log.Printf("Simulating delivery by sleeping for %d seconds", d)
 
@@ -41,16 +39,10 @@ func Delivered(s *Shipment) (string, error) {
 
 	s.Status = "delivered"
 
-	str, err := s.Marshal()
-	if err != nil {
-		log.Printf("error marshalling shipment: %s", err.Error())
-		return "", err
-	}
-
-	return str, nil
+	return s
 }
 
-// DeliveryTime generates a random number between the min and max values, to
+// deliveryTime generates a random number between the min and max values, to
 // determine how long a go routine will sleep to simulate delivery. The min
 // and max values are set during the initialization of the shipper.
 func deliveryTime(min int, max int) int {

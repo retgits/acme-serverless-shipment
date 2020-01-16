@@ -1,0 +1,8 @@
+config:
+  stage: dev
+  project: shipment
+  author: retgits
+  team: vcs
+  app: lambda-eventbridge
+  aws:
+    bucket: %%AWS_S3_BUCKET%%
