@@ -88,7 +88,7 @@ Resources:
       FunctionName: Shipment
       Description: A Lambda function to handle shipments
       MemorySize: 256
-      Timeout: 10
+      Timeout: 130
       Policies:
         - AWSLambdaRole
         - SQSSendMessagePolicy:
@@ -96,7 +96,7 @@ Resources:
       Environment:
         Variables:
           REGION: !Ref AWS::Region
-          RESPONSEQUEUE: !GetAtt ShipmentResponseQueue.QueueName
+          RESPONSEQUEUE: !Ref ShipmentResponseQueue
       Events:
         ValidateCreditcard:
           Type: SQS
