@@ -156,40 +156,8 @@ The input that the function expects, either as the direct message or after trans
         "status": "success"
     },
     "data": {
-        "userid": "8888",
-        "firstname": "John",
-        "lastname": "Blaze",
-        "address": {
-            "street": "20 Riding Lane Av",
-            "city": "San Francisco",
-            "zip": "10201",
-            "state": "CA",
-            "country": "USA"
-        },
-        "email": "jblaze@marvel.com",
-        "delivery": "UPS/FEDEX",
-        "card": {
-            "type": "amex/visa/mastercard/bahubali",
-            "number": "34983479798",
-            "expMonth": "12",
-            "expYear": "21",
-            "ccv": "123"
-        },
-        "cart": [
-            {
-                "id": "1234",
-                "description": "redpants",
-                "quantity": "1",
-                "price": "4"
-            },
-            {
-                "id": "5678",
-                "description": "bluepants",
-                "quantity": "1",
-                "price": "4"
-            }
-        ],
-        "total": "100"
+        "_id": "1234",
+        "delivery": "UPS/FEDEX"
     }
 }
 ```
