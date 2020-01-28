@@ -32,6 +32,7 @@ Resources:
       Description: A Lambda function to handle shipments
       MemorySize: 256
       Timeout: 130
+      Tracing: Active
       Policies:
         - AWSLambdaRole
       Environment:
