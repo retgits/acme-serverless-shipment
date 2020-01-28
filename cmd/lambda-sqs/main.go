@@ -3,10 +3,10 @@ package main
 import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/retgits/shipment"
-	"github.com/retgits/shipment/internal/emitter"
-	"github.com/retgits/shipment/internal/emitter/sqs"
-	"github.com/retgits/shipment/internal/shipper"
+	"github.com/retgits/acme-serverless-shipment"
+	"github.com/retgits/acme-serverless-shipment/internal/emitter"
+	"github.com/retgits/acme-serverless-shipment/internal/emitter/sqs"
+	"github.com/retgits/acme-serverless-shipment/internal/shipper"
 )
 
 func handler(request events.SQSEvent) error {

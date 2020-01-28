@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/retgits/shipment"
-	"github.com/retgits/shipment/internal/emitter"
-	"github.com/retgits/shipment/internal/emitter/eventbridge"
-	"github.com/retgits/shipment/internal/shipper"
+	"github.com/retgits/acme-serverless-shipment"
+	"github.com/retgits/acme-serverless-shipment/internal/emitter"
+	"github.com/retgits/acme-serverless-shipment/internal/emitter/eventbridge"
+	"github.com/retgits/acme-serverless-shipment/internal/shipper"
 )
 
 func handler(request json.RawMessage) error {

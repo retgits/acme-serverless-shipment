@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
-	"github.com/retgits/shipment"
-	"github.com/retgits/shipment/internal/emitter"
+	"github.com/retgits/acme-serverless-shipment"
+	"github.com/retgits/acme-serverless-shipment/internal/emitter"
 )
 
 const (

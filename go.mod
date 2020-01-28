@@ -1,4 +1,4 @@
-module github.com/retgits/shipment
+module github.com/retgits/acme-serverless-shipment
 
 go 1.13
 

@@ -6,7 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/eventbridge"
-	"github.com/retgits/shipment/internal/emitter"
+	"github.com/retgits/acme-serverless-shipment/internal/emitter"
 )
 
 type responder struct{}
