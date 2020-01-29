@@ -2,7 +2,7 @@
 
 > A shipping service, because what is a shop without a way to ship your purchases?
 
-The Shipping service is part of the [ACME Fitness Serverless Shop](https://github.com/vmwarecloudadvocacy/acme_fitness_demo). The goal of this specific service is, as the name implies, to ship products using a wide variety of shipping suppliers.
+The Shipping service is part of the [ACME Fitness Serverless Shop](https://github.com/retgits/acme-serverless). The goal of this specific service is, as the name implies, to ship products using a wide variety of shipping suppliers.
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ Clone this repository
 
 ```bash
 git clone https://github.com/retgits/acme-serverless-shipment
-cd shipment
+cd acme-serverless-shipment
 ```
 
 Get the Go Module dependencies
@@ -41,17 +41,17 @@ Get the Go Module dependencies
 go get ./...
 ```
 
-Switch directories to the EventBridge folder
+Change directories to the [deploy/cloudformation](./deploy/cloudformation) folder
 
 ```bash
-cd ./cmd/lambda-eventbridge
+cd ./deploy/cloudformation
 ```
 
 If your event bus is not called _acmeserverless_, update the name of the `feature` parameter in the `template.yaml` file. Now you can build and deploy the Lambda function:
 
 ```bash
-make build
-make deploy
+make build TYPE=eventbridge
+make deploy TYPE=eventbridge
 ```
 
 ### Testing EventBridge
@@ -61,8 +61,6 @@ You can test the function from the [AWS Lambda Console](https://console.aws.amaz
 ```bash
 go run main.go -event=<any of the files existing in test/eventbridge> -location=<location on disk of the test/eventbridge folder> -bus=<name of the custom bus>
 ```
-
-
 
 ### Prerequisites for SQS
 
@@ -74,7 +72,7 @@ Clone this repository
 
 ```bash
 git clone https://github.com/retgits/acme-serverless-shipment
-cd shipment
+cd acme-serverless-shipment
 ```
 
 Get the Go Module dependencies
@@ -83,17 +81,17 @@ Get the Go Module dependencies
 go get ./...
 ```
 
-Switch directories to the SQS folder
+Change directories to the [deploy/cloudformation](./deploy/cloudformation) folder
 
 ```bash
-cd ./cmd/lambda-sqs
+cd ./deploy/cloudformation
 ```
 
 Now you can build and deploy the Lambda function:
 
 ```bash
-make build
-make deploy
+make build TYPE=sqs
+make deploy TYPE=sqs
 ```
 
 ### Testing SQS
@@ -243,6 +241,8 @@ The Makefiles for the Lambda executables have a few a bunch of options available
 | help    | Displays the help for each target (this message)           |
 | vuln    | Scans the Go.mod file for known vulnerabilities using Snyk |
 
+The targets `build` and `deploy` need a variable **`TYPE`** set to either `eventbridge` or `sqs` to build and deploy the correct Lambda functions.
+
 ## Using Mage
 
 If you want to "go all Go" (_pun intended_) and write plain-old go functions to build and deploy, you can use [Mage](https://magefile.org/). Mage is a make/rake-like build tool using Go so Mage automatically uses the functions you create as Makefile-like runnable targets.
@@ -271,6 +271,8 @@ The Magefile in this repository has a bunch of targets available:
 | deps   | resolves and downloads dependencies to the current development module and then builds and installs them. |
 | test   | 'Go test' automates testing the packages named by the import paths.                                      |
 | vuln   | uses Snyk to test for any known vulnerabilities in go.mod.                                               |
+
+The targets `build` and `deploy` need a variable **`TYPE`** set to either `eventbridge` or `sqs` to build and deploy the correct Lambda functions.
 
 ## Contributing
 
