@@ -41,7 +41,7 @@ Resources:
           Value: !Ref Feature
         - Key: region
           Value: !Ref AWS::Region
-      VisibilityTimeout: 30
+      VisibilityTimeout: 140
   ShipmentResponseQueue:
     Type: AWS::SQS::Queue
     Properties: 
@@ -61,7 +61,7 @@ Resources:
           Value: !Ref Feature
         - Key: region
           Value: !Ref AWS::Region
-      VisibilityTimeout: 30
+      VisibilityTimeout: 140
   ShipmentErrorQueue:
     Type: AWS::SQS::Queue
     Properties: 
@@ -78,11 +78,11 @@ Resources:
           Value: !Ref Feature
         - Key: region
           Value: !Ref AWS::Region
-      VisibilityTimeout: 30
+      VisibilityTimeout: 140
   Shipment:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: lambda-sqs
+      Handler: lambda-shipment-sqs
       Runtime: go1.x
       CodeUri: bin/
       FunctionName: Shipment
