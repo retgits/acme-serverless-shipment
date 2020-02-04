@@ -85,7 +85,7 @@ Resources:
       Handler: lambda-shipment-sqs
       Runtime: go1.x
       CodeUri: bin/
-      FunctionName: Shipment
+      FunctionName: !Sub "Shipment-${Stage}"
       Description: A Lambda function to handle shipments
       MemorySize: 256
       Timeout: 130
