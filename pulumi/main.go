@@ -37,9 +37,6 @@ type Tags struct {
 
 // LambdaConfig contains the key-value pairs for the configuration of AWS Lambda in this stack
 type LambdaConfig struct {
-	// The eventing layer to use
-	EventingType string `json:"type"`
-
 	// The S3 bucket to upload the compiled and zipped code to
 	S3Bucket string `json:"bucket"`
 
@@ -48,9 +45,6 @@ type LambdaConfig struct {
 
 	// The SQS queue to receives messages from
 	ShipmentRequestQueue string `json:"requestqueue"`
-
-	// The EventBus to send responses to
-	EventBus string `json:"eventbus"`
 
 	// The AWS region used
 	Region string `json:"region"`
@@ -91,7 +85,7 @@ func main() {
 			}
 
 			// Find the working folder
-			fnFolder := path.Join(wd, "..", "cmd", fmt.Sprintf("lambda-shipment-%s", lambdaConfig.EventingType))
+			fnFolder := path.Join(wd, "..", "cmd", "lambda-shipment-sqs")
 
 			// Run go build
 			if err := run(fnFolder, "GOOS=linux GOARCH=amd64 go build"); err != nil {
@@ -100,13 +94,13 @@ func main() {
 			}
 
 			// Zip up the binary
-			if err := run(fnFolder, fmt.Sprintf("zip ./lambda-shipment-%s.zip, ./lambda-shipment-%s", lambdaConfig.EventingType, lambdaConfig.EventingType)); err != nil {
+			if err := run(fnFolder, "zip ./lambda-shipment-sqs.zip, ./lambda-shipment-sqs"); err != nil {
 				fmt.Printf("Error creating zipfile: %s", err.Error())
 				os.Exit(1)
 			}
 
 			// Upload to AWS S3
-			if err := run(fnFolder, fmt.Sprintf("aws s3 cp ./lambda-shipment-%s.zip, s3://%s/acmeserverless/%s/lambda-shipment-%s.zip", lambdaConfig.EventingType, lambdaConfig.S3Bucket, ctx.Stack(), lambdaConfig.EventingType)); err != nil {
+			if err := run(fnFolder, fmt.Sprintf("aws s3 cp ./lambda-shipment-sqs.zip, s3://%s/acmeserverless/%s/lambda-shipment-sqs.zip", lambdaConfig.S3Bucket, ctx.Stack())); err != nil {
 				fmt.Printf("Error creating zipfile: %s", err.Error())
 				os.Exit(1)
 			}
@@ -146,10 +140,8 @@ func main() {
 			return err
 		}
 
-		// In case the Lambda function uses SQS, add a policy document
-		// to allow the function to use SQS as event source
-		if lambdaConfig.EventingType == "sqs" {
-			policyString := fmt.Sprintf(`{
+		// Add a policy document to allow the function to use SQS as event source
+		policyString := fmt.Sprintf(`{
 				"Version": "2012-10-17",
 				"Statement": [
 					{
@@ -171,16 +163,15 @@ func main() {
 				]
 			}`, lambdaConfig.ShipmentResponseQueue, lambdaConfig.ShipmentRequestQueue)
 
-			sqsPolicy := &iam.RolePolicyArgs{
-				Name:   pulumi.String("ACMEServerlessShipmentSQSPolicy"),
-				Role:   role.Name,
-				Policy: pulumi.String(policyString),
-			}
+		sqsPolicy := &iam.RolePolicyArgs{
+			Name:   pulumi.String("ACMEServerlessShipmentSQSPolicy"),
+			Role:   role.Name,
+			Policy: pulumi.String(policyString),
+		}
 
-			_, err := iam.NewRolePolicy(ctx, "ACMEServerlessShipmentSQSPolicy", sqsPolicy)
-			if err != nil {
-				return err
-			}
+		_, err = iam.NewRolePolicy(ctx, "ACMEServerlessShipmentSQSPolicy", sqsPolicy)
+		if err != nil {
+			return err
 		}
 
 		// Export the role ARN as an output of the Pulumi stack
@@ -193,12 +184,7 @@ func main() {
 		variables["FUNCTION_NAME"] = pulumi.String(fmt.Sprintf("%s-lambda-shipment", ctx.Stack()))
 		variables["VERSION"] = tags.Version
 		variables["STAGE"] = pulumi.String(ctx.Stack())
-
-		if lambdaConfig.EventingType == "sqs" {
-			variables["RESPONSEQUEUE"] = pulumi.String(lambdaConfig.ShipmentResponseQueue)
-		} else {
-			variables["EVENTBUS"] = pulumi.String(lambdaConfig.EventBus)
-		}
+		variables["RESPONSEQUEUE"] = pulumi.String(lambdaConfig.ShipmentResponseQueue)
 
 		environment := lambda.FunctionEnvironmentArgs{
 			Variables: pulumi.StringMap(variables),
@@ -211,10 +197,10 @@ func main() {
 			Name:        pulumi.String(fmt.Sprintf("%s-lambda-shipment", ctx.Stack())),
 			MemorySize:  pulumi.Int(256),
 			Timeout:     pulumi.Int(10),
-			Handler:     pulumi.String(fmt.Sprintf("lambda-shipment-%s", lambdaConfig.EventingType)),
+			Handler:     pulumi.String("lambda-shipment-sqs"),
 			Environment: environment,
 			S3Bucket:    pulumi.String(lambdaConfig.S3Bucket),
-			S3Key:       pulumi.String(fmt.Sprintf("acmeserverless/%s/lambda-shipment-%s.zip", ctx.Stack(), lambdaConfig.EventingType)),
+			S3Key:       pulumi.String(fmt.Sprintf("acmeserverless/%s/lambda-shipment-sqs.zip", ctx.Stack())),
 			Role:        role.Arn,
 			Tags:        pulumi.Map(tagMap),
 		}
@@ -224,21 +210,19 @@ func main() {
 			return err
 		}
 
-		if lambdaConfig.EventingType == "sqs" {
-			sqsMapping := &lambda.EventSourceMappingArgs{
-				BatchSize:      pulumi.Int(1),
-				Enabled:        pulumi.Bool(true),
-				FunctionName:   function.Arn,
-				EventSourceArn: pulumi.String(lambdaConfig.ShipmentRequestQueue),
-			}
-
-			_, err := lambda.NewEventSourceMapping(ctx, fmt.Sprintf("%s-lambda-shipment", ctx.Stack()), sqsMapping)
-			if err != nil {
-				return err
-			}
+		sqsMapping := &lambda.EventSourceMappingArgs{
+			BatchSize:      pulumi.Int(1),
+			Enabled:        pulumi.Bool(true),
+			FunctionName:   function.Arn,
+			EventSourceArn: pulumi.String(lambdaConfig.ShipmentRequestQueue),
 		}
 
-		ctx.Export(fmt.Sprintf("lambda-shipment-%s::Arn", lambdaConfig.EventingType), function.Arn)
+		_, err = lambda.NewEventSourceMapping(ctx, fmt.Sprintf("%s-lambda-shipment", ctx.Stack()), sqsMapping)
+		if err != nil {
+			return err
+		}
+
+		ctx.Export("lambda-shipment-sqs::Arn", function.Arn)
 
 		return nil
 	})
