@@ -1,0 +1,255 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"path"
+
+	"github.com/pulumi/pulumi-aws/sdk/go/aws/iam"
+	"github.com/pulumi/pulumi-aws/sdk/go/aws/lambda"
+	"github.com/pulumi/pulumi/sdk/go/pulumi"
+	"github.com/pulumi/pulumi/sdk/go/pulumi/config"
+)
+
+const (
+	// The shell to use
+	shell = "sh"
+
+	// The flag for the shell to read commands from a string
+	shellFlag = "-c"
+)
+
+// Tags are key-value pairs to apply to the resources created by this stack
+type Tags struct {
+	// Author is the person who created the code, or performed the deployment
+	Author pulumi.String
+
+	// Feature is the project that this resource belongs to
+	Feature pulumi.String
+
+	// Team is the team that is responsible to manage this resource
+	Team pulumi.String
+
+	// Version is the version of the code for this resource
+	Version pulumi.String
+}
+
+// LambdaConfig contains the key-value pairs for the configuration of AWS Lambda in this stack
+type LambdaConfig struct {
+	// The eventing layer to use
+	EventingType string `json:"type"`
+
+	// The S3 bucket to upload the compiled and zipped code to
+	S3Bucket string `json:"bucket"`
+
+	// The SQS queue to send responses to
+	ShipmentResponseQueue string `json:"responsequeue"`
+
+	// The SQS queue to receives messages from
+	ShipmentRequestQueue string `json:"requestqueue"`
+
+	// The EventBus to send responses to
+	EventBus string `json:"eventbus"`
+
+	// The AWS region used
+	Region string `json:"region"`
+
+	// The DSN used to connect to Sentry
+	SentryDSN string `json:"sentrydsn"`
+}
+
+func main() {
+	pulumi.Run(func(ctx *pulumi.Context) error {
+		// Read the configuration data from Pulumi.<stack>.yaml
+		conf := config.New(ctx, "awsconfig")
+
+		// Create a new Tags object with the data from the configuration
+		var tags Tags
+		conf.RequireObject("tags", &tags)
+
+		// Create a new DynamoConfig object with the data from the configuration
+		var lambdaConfig LambdaConfig
+		conf.RequireObject("lambda", &lambdaConfig)
+
+		// Create a map[string]pulumi.Input of the tags
+		// the first four tags come from the configuration file
+		// the last two are derived from this deployment
+		tagMap := make(map[string]pulumi.Input)
+		tagMap["Author"] = tags.Author
+		tagMap["Feature"] = tags.Feature
+		tagMap["Team"] = tags.Team
+		tagMap["Version"] = tags.Version
+		tagMap["ManagedBy"] = pulumi.String("Pulumi")
+		tagMap["Stage"] = pulumi.String(ctx.Stack())
+
+		// Compile and upload the AWS Lambda functions only if this isn't a dry run
+		if !ctx.DryRun() {
+			wd, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+
+			// Find the working folder
+			fnFolder := path.Join(wd, "..", "cmd", fmt.Sprintf("lambda-shipment-%s", lambdaConfig.EventingType))
+
+			// Run go build
+			if err := run(fnFolder, "GOOS=linux GOARCH=amd64 go build"); err != nil {
+				fmt.Printf("Error building code: %s", err.Error())
+				os.Exit(1)
+			}
+
+			// Zip up the binary
+			if err := run(fnFolder, fmt.Sprintf("zip ./lambda-shipment-%s.zip, ./lambda-shipment-%s", lambdaConfig.EventingType, lambdaConfig.EventingType)); err != nil {
+				fmt.Printf("Error creating zipfile: %s", err.Error())
+				os.Exit(1)
+			}
+
+			// Upload to AWS S3
+			if err := run(fnFolder, fmt.Sprintf("aws s3 cp ./lambda-shipment-%s.zip, s3://%s/acmeserverless/%s/lambda-shipment-%s.zip", lambdaConfig.EventingType, lambdaConfig.S3Bucket, ctx.Stack(), lambdaConfig.EventingType)); err != nil {
+				fmt.Printf("Error creating zipfile: %s", err.Error())
+				os.Exit(1)
+			}
+		}
+
+		// Create the IAM policy for the function.
+		roleArgs := &iam.RoleArgs{
+			AssumeRolePolicy: pulumi.String(`{
+				"Version": "2012-10-17",
+				"Statement": [
+				{
+					"Action": "sts:AssumeRole",
+					"Principal": {
+						"Service": "lambda.amazonaws.com"
+					},
+					"Effect": "Allow",
+					"Sid": ""
+				}
+				]
+			}`),
+			Description: pulumi.String("Role for the Shipment Service of the ACME Serverless Fitness Shop"),
+			Tags:        pulumi.Map(tagMap),
+		}
+
+		role, err := iam.NewRole(ctx, "ACMEServerlessShipmentRole", roleArgs)
+		if err != nil {
+			return err
+		}
+
+		managedPolicy := &iam.RolePolicyAttachmentArgs{
+			PolicyArn: pulumi.String("arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"),
+			Role:      role.Name,
+		}
+
+		_, err = iam.NewRolePolicyAttachment(ctx, "AWSLambdaBasicExecutionRole", managedPolicy)
+		if err != nil {
+			return err
+		}
+
+		// In case the Lambda function uses SQS, add a policy document
+		// to allow the function to use SQS as event source
+		if lambdaConfig.EventingType == "sqs" {
+			policyString := fmt.Sprintf(`{
+				"Version": "2012-10-17",
+				"Statement": [
+					{
+						"Action": [
+							"sqs:SendMessage*"
+						],
+						"Effect": "Allow",
+						"Resource": "%s"
+					},
+					{
+						"Action": [
+							"sqs:ReceiveMessage",
+							"sqs:DeleteMessage",
+							"sqs:GetQueueAttributes"
+						],
+						"Effect": "Allow",
+						"Resource": "%s"
+					}
+				]
+			}`, lambdaConfig.ShipmentResponseQueue, lambdaConfig.ShipmentRequestQueue)
+
+			sqsPolicy := &iam.RolePolicyArgs{
+				Name:   pulumi.String("ACMEServerlessShipmentSQSPolicy"),
+				Role:   role.Name,
+				Policy: pulumi.String(policyString),
+			}
+
+			_, err := iam.NewRolePolicy(ctx, "ACMEServerlessShipmentSQSPolicy", sqsPolicy)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Export the role ARN as an output of the Pulumi stack
+		ctx.Export("ACMEServerlessShipmentRole::Arn", role.Arn)
+
+		// Create the environment variables for the Lambda function
+		variables := make(map[string]pulumi.StringInput)
+		variables["REGION"] = pulumi.String(lambdaConfig.Region)
+		variables["SENTRY_DSN"] = pulumi.String(lambdaConfig.SentryDSN)
+		variables["FUNCTION_NAME"] = pulumi.String(fmt.Sprintf("%s-lambda-shipment", ctx.Stack()))
+		variables["VERSION"] = tags.Version
+		variables["STAGE"] = pulumi.String(ctx.Stack())
+
+		if lambdaConfig.EventingType == "sqs" {
+			variables["RESPONSEQUEUE"] = pulumi.String(lambdaConfig.ShipmentResponseQueue)
+		} else {
+			variables["EVENTBUS"] = pulumi.String(lambdaConfig.EventBus)
+		}
+
+		environment := lambda.FunctionEnvironmentArgs{
+			Variables: pulumi.StringMap(variables),
+		}
+
+		// Create the AWS Lambda function
+		functionArgs := &lambda.FunctionArgs{
+			Description: pulumi.String("A Lambda function to handle shipments"),
+			Runtime:     pulumi.String("go1.x"),
+			Name:        pulumi.String(fmt.Sprintf("%s-lambda-shipment", ctx.Stack())),
+			MemorySize:  pulumi.Int(256),
+			Timeout:     pulumi.Int(10),
+			Handler:     pulumi.String(fmt.Sprintf("lambda-shipment-%s", lambdaConfig.EventingType)),
+			Environment: environment,
+			S3Bucket:    pulumi.String(lambdaConfig.S3Bucket),
+			S3Key:       pulumi.String(fmt.Sprintf("acmeserverless/%s/lambda-shipment-%s.zip", ctx.Stack(), lambdaConfig.EventingType)),
+			Role:        role.Arn,
+			Tags:        pulumi.Map(tagMap),
+		}
+
+		function, err := lambda.NewFunction(ctx, fmt.Sprintf("%s-lambda-shipment", ctx.Stack()), functionArgs)
+		if err != nil {
+			return err
+		}
+
+		if lambdaConfig.EventingType == "sqs" {
+			sqsMapping := &lambda.EventSourceMappingArgs{
+				BatchSize:      pulumi.Int(1),
+				Enabled:        pulumi.Bool(true),
+				FunctionName:   function.Arn,
+				EventSourceArn: pulumi.String(lambdaConfig.ShipmentRequestQueue),
+			}
+
+			_, err := lambda.NewEventSourceMapping(ctx, fmt.Sprintf("%s-lambda-shipment", ctx.Stack()), sqsMapping)
+			if err != nil {
+				return err
+			}
+		}
+
+		ctx.Export(fmt.Sprintf("lambda-shipment-%s::Arn", lambdaConfig.EventingType), function.Arn)
+
+		return nil
+	})
+}
+
+// run creates a Cmd struct to execute the named program with the given arguments.
+// After that, it starts the specified command and waits for it to complete.
+func run(folder string, args string) error {
+	cmd := exec.Command(shell, shellFlag, args)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Dir = folder
+	return cmd.Run()
+}

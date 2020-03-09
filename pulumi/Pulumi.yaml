@@ -1,0 +1,3 @@
+name: acmeserverless-shipment
+runtime: go
+description: The Shipment service is part of the ACME Fitness Serverless Shop. The goal of this specific service is, as the name implies, to ship products using a wide variety of shipping suppliers.
