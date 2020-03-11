@@ -98,12 +98,6 @@ func main() {
 				fmt.Printf("Error creating zipfile: %s", err.Error())
 				os.Exit(1)
 			}
-
-			// Upload to AWS S3
-			if err := run(fnFolder, fmt.Sprintf("aws s3 cp ./lambda-shipment-sqs.zip s3://%s/acmeserverless/%s/lambda-shipment-sqs.zip", lambdaConfig.S3Bucket, ctx.Stack())); err != nil {
-				fmt.Printf("Error creating zipfile: %s", err.Error())
-				os.Exit(1)
-			}
 		}
 
 		// Create the IAM policy for the function.
@@ -130,12 +124,10 @@ func main() {
 			return err
 		}
 
-		managedPolicy := &iam.RolePolicyAttachmentArgs{
+		_, err = iam.NewRolePolicyAttachment(ctx, "AWSLambdaBasicExecutionRole", &iam.RolePolicyAttachmentArgs{
 			PolicyArn: pulumi.String("arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"),
 			Role:      role.Name,
-		}
-
-		_, err = iam.NewRolePolicyAttachment(ctx, "AWSLambdaBasicExecutionRole", managedPolicy)
+		})
 		if err != nil {
 			return err
 		}
@@ -163,19 +155,14 @@ func main() {
 				]
 			}`, lambdaConfig.ShipmentResponseQueue, lambdaConfig.ShipmentRequestQueue)
 
-		sqsPolicy := &iam.RolePolicyArgs{
+		_, err = iam.NewRolePolicy(ctx, "ACMEServerlessShipmentSQSPolicy", &iam.RolePolicyArgs{
 			Name:   pulumi.String("ACMEServerlessShipmentSQSPolicy"),
 			Role:   role.Name,
 			Policy: pulumi.String(policyString),
-		}
-
-		_, err = iam.NewRolePolicy(ctx, "ACMEServerlessShipmentSQSPolicy", sqsPolicy)
+		})
 		if err != nil {
 			return err
 		}
-
-		// Export the role ARN as an output of the Pulumi stack
-		ctx.Export("ACMEServerlessShipmentRole::Arn", role.Arn)
 
 		// Create the environment variables for the Lambda function
 		variables := make(map[string]pulumi.StringInput)
@@ -199,8 +186,7 @@ func main() {
 			Timeout:     pulumi.Int(10),
 			Handler:     pulumi.String("lambda-shipment-sqs"),
 			Environment: environment,
-			S3Bucket:    pulumi.String(lambdaConfig.S3Bucket),
-			S3Key:       pulumi.String(fmt.Sprintf("acmeserverless/%s/lambda-shipment-sqs.zip", ctx.Stack())),
+			Code:        pulumi.NewFileArchive("./cmd/lambda-shipment-sqs/lambda-shipment-sqs.zip"),
 			Role:        role.Arn,
 			Tags:        pulumi.Map(tagMap),
 		}
@@ -210,18 +196,18 @@ func main() {
 			return err
 		}
 
-		sqsMapping := &lambda.EventSourceMappingArgs{
+		_, err = lambda.NewEventSourceMapping(ctx, fmt.Sprintf("%s-lambda-shipment", ctx.Stack()), &lambda.EventSourceMappingArgs{
 			BatchSize:      pulumi.Int(1),
 			Enabled:        pulumi.Bool(true),
 			FunctionName:   function.Arn,
 			EventSourceArn: pulumi.String(lambdaConfig.ShipmentRequestQueue),
-		}
-
-		_, err = lambda.NewEventSourceMapping(ctx, fmt.Sprintf("%s-lambda-shipment", ctx.Stack()), sqsMapping)
+		})
 		if err != nil {
 			return err
 		}
 
+		// Export the Role ARN and Function ARN as an output of the Pulumi stack
+		ctx.Export("ACMEServerlessShipmentRole::Arn", role.Arn)
 		ctx.Export("lambda-shipment-sqs::Arn", function.Arn)
 
 		return nil
