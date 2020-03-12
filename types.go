@@ -89,6 +89,11 @@ func UnmarshalShipmentRequested(data []byte) (ShipmentRequested, error) {
 	return r, err
 }
 
+// Marshal returns the JSON encoding of ShipmentRequested.
+func (e *ShipmentRequested) Marshal() ([]byte, error) {
+	return json.Marshal(e)
+}
+
 // Marshal returns the JSON encoding of ShipmentSent.
 func (e *ShipmentSent) Marshal() ([]byte, error) {
 	return json.Marshal(e)
