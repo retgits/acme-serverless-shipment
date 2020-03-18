@@ -5,15 +5,11 @@ template:
   config:
       aws:region:
         description: The AWS region to deploy into
-      awsconfig:lambda:
-        responsequeue:
-          description: The ARN of the Shipment Response SQS queue (which you can create using the Pulumi deployment in the acme-serverless repo)
-        requestqueue:
-          description: The ARN of the Shipment Request SQS queue (which you can create using the Pulumi deployment in the acme-serverless repo)
-        region:
-          description: The AWS region to deploy into
+      awsconfig:generic:
         sentrydsn:
           description: The DSN to connect to Sentry
+        accountid:
+          description: Your AWS Account ID
       awsconfig:tags:
         author:
           description: The author, you...
@@ -24,4 +20,4 @@ template:
           description: The team you're on
         version:
           description: The version
-          default: 0.1.0
+          default: 0.2.0

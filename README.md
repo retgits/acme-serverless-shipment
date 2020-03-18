@@ -27,11 +27,9 @@ You'll need to create a [Pulumi.dev.yaml](./pulumi/Pulumi.dev.yaml) file that wi
 ```yaml
 config:
   aws:region: us-west-2 ## The region you want to deploy to
-  awsconfig:lambda:
-    responsequeue: ## The ARN of the Shipment Response SQS queue (which you can create using the Pulumi deployment in the acme-serverless repo)
-    requestqueue: ## The ARN of the Shipment Request SQS queue (which you can create using the Pulumi deployment in the acme-serverless repo)
-    region: us-west-2 ## The region you want to deploy to
+  awsconfig:generic:
     sentrydsn: ## The DSN to connect to Sentry
+    accountid: ## Your AWS Account ID
   awsconfig:tags:
     author: retgits ## The author, you...
     feature: acmeserverless

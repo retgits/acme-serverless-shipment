@@ -3,21 +3,15 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 
 	"github.com/pulumi/pulumi-aws/sdk/go/aws/iam"
 	"github.com/pulumi/pulumi-aws/sdk/go/aws/lambda"
+	"github.com/pulumi/pulumi-aws/sdk/go/aws/sqs"
 	"github.com/pulumi/pulumi/sdk/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/go/pulumi/config"
-)
-
-const (
-	// The shell to use
-	shell = "sh"
-
-	// The flag for the shell to read commands from a string
-	shellFlag = "-c"
+	"github.com/retgits/pulumi-helpers/builder"
+	"github.com/retgits/pulumi-helpers/sampolicies"
 )
 
 // Tags are key-value pairs to apply to the resources created by this stack
@@ -35,23 +29,26 @@ type Tags struct {
 	Version pulumi.String
 }
 
-// LambdaConfig contains the key-value pairs for the configuration of AWS Lambda in this stack
-type LambdaConfig struct {
-	// The SQS queue to send responses to
-	ShipmentResponseQueue string `json:"responsequeue"`
-
-	// The SQS queue to receives messages from
-	ShipmentRequestQueue string `json:"requestqueue"`
-
+// GenericConfig contains the key-value pairs for the configuration of AWS in this stack
+type GenericConfig struct {
 	// The AWS region used
-	Region string `json:"region"`
+	Region string
 
 	// The DSN used to connect to Sentry
 	SentryDSN string `json:"sentrydsn"`
+
+	// The AWS AccountID to use
+	AccountID string `json:"accountid"`
 }
 
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
+		// Get the region
+		region, found := ctx.GetConfig("aws:region")
+		if !found {
+			return fmt.Errorf("region not found")
+		}
+
 		// Read the configuration data from Pulumi.<stack>.yaml
 		conf := config.New(ctx, "awsconfig")
 
@@ -59,9 +56,10 @@ func main() {
 		var tags Tags
 		conf.RequireObject("tags", &tags)
 
-		// Create a new DynamoConfig object with the data from the configuration
-		var lambdaConfig LambdaConfig
-		conf.RequireObject("lambda", &lambdaConfig)
+		// Create a new GenericConfig object with the data from the configuration
+		var genericConfig GenericConfig
+		conf.RequireObject("generic", &genericConfig)
+		genericConfig.Region = region
 
 		// Create a map[string]pulumi.Input of the tags
 		// the first four tags come from the configuration file
@@ -82,36 +80,15 @@ func main() {
 
 		// Find the working folder
 		fnFolder := path.Join(wd, "..", "cmd", "lambda-shipment-sqs")
-
-		// Run go build
-		if err := run(fnFolder, "GOOS=linux GOARCH=amd64 go build"); err != nil {
-			fmt.Printf("Error building code: %s", err.Error())
-			os.Exit(1)
-		}
-
-		// Zip up the binary
-		if err := run(fnFolder, "zip ./lambda-shipment-sqs.zip ./lambda-shipment-sqs"); err != nil {
-			fmt.Printf("Error creating zipfile: %s", err.Error())
-			os.Exit(1)
-		}
+		buildFactory := builder.NewFactory().WithFolder(fnFolder)
+		buildFactory.MustBuild()
+		buildFactory.MustZip()
 
 		// Create the IAM policy for the function.
 		roleArgs := &iam.RoleArgs{
-			AssumeRolePolicy: pulumi.String(`{
-				"Version": "2012-10-17",
-				"Statement": [
-				{
-					"Action": "sts:AssumeRole",
-					"Principal": {
-						"Service": "lambda.amazonaws.com"
-					},
-					"Effect": "Allow",
-					"Sid": ""
-				}
-				]
-			}`),
-			Description: pulumi.String("Role for the Shipment Service of the ACME Serverless Fitness Shop"),
-			Tags:        pulumi.Map(tagMap),
+			AssumeRolePolicy: pulumi.String(sampolicies.AssumeRoleLambda()),
+			Description:      pulumi.String("Role for the Shipment Service of the ACME Serverless Fitness Shop"),
+			Tags:             pulumi.Map(tagMap),
 		}
 
 		role, err := iam.NewRole(ctx, "ACMEServerlessShipmentRole", roleArgs)
@@ -127,33 +104,36 @@ func main() {
 			return err
 		}
 
+		// Lookup the SQS queues
+		responseQueue, err := sqs.LookupQueue(ctx, &sqs.LookupQueueArgs{
+			Name: fmt.Sprintf("%s-acmeserverless-sqs-shipment-response", ctx.Stack()),
+		})
+		if err != nil {
+			return err
+		}
+
+		requestQueue, err := sqs.LookupQueue(ctx, &sqs.LookupQueueArgs{
+			Name: fmt.Sprintf("%s-acmeserverless-sqs-shipment-request", ctx.Stack()),
+		})
+		if err != nil {
+			return err
+		}
+
+		// Create a factory to get policies from
+		iamFactory := sampolicies.NewFactory().WithAccountID(genericConfig.AccountID).WithPartition("aws").WithRegion(genericConfig.Region)
+
 		// Add a policy document to allow the function to use SQS as event source
-		policyString := fmt.Sprintf(`{
-				"Version": "2012-10-17",
-				"Statement": [
-					{
-						"Action": [
-							"sqs:SendMessage*"
-						],
-						"Effect": "Allow",
-						"Resource": "%s"
-					},
-					{
-						"Action": [
-							"sqs:ReceiveMessage",
-							"sqs:DeleteMessage",
-							"sqs:GetQueueAttributes"
-						],
-						"Effect": "Allow",
-						"Resource": "%s"
-					}
-				]
-			}`, lambdaConfig.ShipmentResponseQueue, lambdaConfig.ShipmentRequestQueue)
+		iamFactory.AddSQSSendMessagePolicy(responseQueue.Arn)
+		iamFactory.AddSQSPollerPolicy(requestQueue.Arn)
+		policies, err := iamFactory.GetPolicyStatement()
+		if err != nil {
+			return err
+		}
 
 		_, err = iam.NewRolePolicy(ctx, "ACMEServerlessShipmentSQSPolicy", &iam.RolePolicyArgs{
 			Name:   pulumi.String("ACMEServerlessShipmentSQSPolicy"),
 			Role:   role.Name,
-			Policy: pulumi.String(policyString),
+			Policy: pulumi.String(policies),
 		})
 		if err != nil {
 			return err
@@ -161,12 +141,12 @@ func main() {
 
 		// Create the environment variables for the Lambda function
 		variables := make(map[string]pulumi.StringInput)
-		variables["REGION"] = pulumi.String(lambdaConfig.Region)
-		variables["SENTRY_DSN"] = pulumi.String(lambdaConfig.SentryDSN)
+		variables["REGION"] = pulumi.String(genericConfig.Region)
+		variables["SENTRY_DSN"] = pulumi.String(genericConfig.SentryDSN)
 		variables["FUNCTION_NAME"] = pulumi.String(fmt.Sprintf("%s-lambda-shipment", ctx.Stack()))
 		variables["VERSION"] = tags.Version
 		variables["STAGE"] = pulumi.String(ctx.Stack())
-		variables["RESPONSEQUEUE"] = pulumi.String(lambdaConfig.ShipmentResponseQueue)
+		variables["RESPONSEQUEUE"] = pulumi.String(responseQueue.Arn)
 
 		environment := lambda.FunctionEnvironmentArgs{
 			Variables: pulumi.StringMap(variables),
@@ -195,7 +175,7 @@ func main() {
 			BatchSize:      pulumi.Int(1),
 			Enabled:        pulumi.Bool(true),
 			FunctionName:   function.Arn,
-			EventSourceArn: pulumi.String(lambdaConfig.ShipmentRequestQueue),
+			EventSourceArn: pulumi.String(requestQueue.Arn),
 		})
 		if err != nil {
 			return err
@@ -207,14 +187,4 @@ func main() {
 
 		return nil
 	})
-}
-
-// run creates a Cmd struct to execute the named program with the given arguments.
-// After that, it starts the specified command and waits for it to complete.
-func run(folder string, args string) error {
-	cmd := exec.Command(shell, shellFlag, args)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Dir = folder
-	return cmd.Run()
 }
