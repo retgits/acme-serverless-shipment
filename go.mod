@@ -1,5 +1,7 @@
 module github.com/retgits/acme-serverless-shipment
 
+replace github.com/wavefronthq/wavefront-lambda-go => github.com/retgits/wavefront-lambda-go v0.0.0-20200402174306-c89629d5856a
+
 go 1.13
 
 require (
@@ -10,4 +12,5 @@ require (
 	github.com/pulumi/pulumi v1.12.0
 	github.com/pulumi/pulumi-aws v1.24.0
 	github.com/retgits/pulumi-helpers v0.1.3
+	github.com/wavefronthq/wavefront-lambda-go v0.0.0-20190812171804-d9475d6695cc
 )
