@@ -65,7 +65,7 @@ func handler(request events.SQSEvent) error {
 		Category:  acmeserverless.ShipmentSentEventName,
 		Timestamp: time.Now().Unix(),
 		Level:     sentry.LevelInfo,
-		Data:      acmeserverless.ToSentryMap(req.Data),
+		Data:      acmeserverless.ToSentryMap(evt.Data),
 	})
 
 	// Create a new SQS EventEmitter and send the event
@@ -94,7 +94,7 @@ func handler(request events.SQSEvent) error {
 		Category:  acmeserverless.ShipmentDeliveredEventName,
 		Timestamp: time.Now().Unix(),
 		Level:     sentry.LevelInfo,
-		Data:      acmeserverless.ToSentryMap(req.Data),
+		Data:      acmeserverless.ToSentryMap(evt.Data),
 	})
 
 	err = em.Send(evt)
