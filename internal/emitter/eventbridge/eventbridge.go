@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/eventbridge"
-	shipment "github.com/retgits/acme-serverless-shipment"
+	acmeserverless "github.com/retgits/acme-serverless"
 	"github.com/retgits/acme-serverless-shipment/internal/emitter"
 )
 
@@ -27,7 +27,7 @@ func New() emitter.EventEmitter {
 // by the environment variable EVENTBUS. The AWS region this code
 // looks in to find the queue is determined by the environment
 // variable REGION. The method returns an error if anything goes wrong.
-func (r responder) Send(e shipment.ShipmentSent) error {
+func (r responder) Send(e acmeserverless.ShipmentSent) error {
 	payload, err := e.Marshal()
 	if err != nil {
 		return err

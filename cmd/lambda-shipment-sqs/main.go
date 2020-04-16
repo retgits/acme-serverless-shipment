@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/getsentry/sentry-go"
-	shipment "github.com/retgits/acme-serverless-shipment"
+	acmeserverless "github.com/retgits/acme-serverless"
 	"github.com/retgits/acme-serverless-shipment/internal/emitter/sqs"
 	"github.com/retgits/acme-serverless-shipment/internal/shipper"
 	wflambda "github.com/wavefronthq/wavefront-lambda-go"
@@ -35,37 +35,37 @@ func handler(request events.SQSEvent) error {
 	})
 
 	// Unmarshal the ShipmentRequested event to a struct
-	req, err := shipment.UnmarshalShipmentRequested([]byte(request.Records[0].Body))
+	req, err := acmeserverless.UnmarshalShipmentRequested([]byte(request.Records[0].Body))
 	if err != nil {
 		return handleError("unmarshaling shipment", err)
 	}
 
 	// Send a breadcrumb to Sentry with the shipment request
 	sentry.AddBreadcrumb(&sentry.Breadcrumb{
-		Category:  shipment.ShipmentRequestedEvent,
+		Category:  acmeserverless.ShipmentRequestedEventName,
 		Timestamp: time.Now().Unix(),
 		Level:     sentry.LevelInfo,
-		Data:      req.Data.ToMap(),
+		Data:      acmeserverless.ToSentryMap(req.Data),
 	})
 
 	shipmentData := shipper.Sent(req.Data)
 
-	evt := shipment.ShipmentSent{
-		Metadata: shipment.Metadata{
-			Domain: shipment.Domain,
+	evt := acmeserverless.ShipmentSent{
+		Metadata: acmeserverless.Metadata{
+			Domain: acmeserverless.ShipmentDomain,
 			Source: "SendShipment",
-			Type:   shipment.ShipmentSentEvent,
-			Status: "success",
+			Type:   acmeserverless.ShipmentSentEventName,
+			Status: acmeserverless.DefaultSuccessStatus,
 		},
 		Data: shipmentData,
 	}
 
 	// Send a breadcrumb to Sentry with the shipment status
 	sentry.AddBreadcrumb(&sentry.Breadcrumb{
-		Category:  shipment.ShipmentSentEvent,
+		Category:  acmeserverless.ShipmentSentEventName,
 		Timestamp: time.Now().Unix(),
 		Level:     sentry.LevelInfo,
-		Data:      req.Data.ToMap(),
+		Data:      acmeserverless.ToSentryMap(req.Data),
 	})
 
 	// Create a new SQS EventEmitter and send the event
@@ -79,22 +79,22 @@ func handler(request events.SQSEvent) error {
 	shipmentData = shipper.Delivered(shipmentData)
 
 	// Create a new event with the new status of the shipment
-	evt = shipment.ShipmentSent{
-		Metadata: shipment.Metadata{
-			Domain: shipment.Domain,
+	evt = acmeserverless.ShipmentSent{
+		Metadata: acmeserverless.Metadata{
+			Domain: acmeserverless.ShipmentDomain,
 			Source: "SendShipment",
-			Type:   shipment.ShipmentDeliveredEvent,
-			Status: "success",
+			Type:   acmeserverless.ShipmentDeliveredEventName,
+			Status: acmeserverless.DefaultSuccessStatus,
 		},
 		Data: shipmentData,
 	}
 
 	// Send a breadcrumb to Sentry with the shipment status
 	sentry.AddBreadcrumb(&sentry.Breadcrumb{
-		Category:  shipment.ShipmentDeliveredEvent,
+		Category:  acmeserverless.ShipmentDeliveredEventName,
 		Timestamp: time.Now().Unix(),
 		Level:     sentry.LevelInfo,
-		Data:      req.Data.ToMap(),
+		Data:      acmeserverless.ToSentryMap(req.Data),
 	})
 
 	err = em.Send(evt)

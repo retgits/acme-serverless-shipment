@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
-	shipment "github.com/retgits/acme-serverless-shipment"
+	acmeserverless "github.com/retgits/acme-serverless"
 )
 
 const (
@@ -16,12 +16,12 @@ const (
 
 // Sent takes care of sending the shipment to the customer. This would be the interface between
 // the ACME Serverless Fitness Shop and the shipper.
-func Sent(r shipment.ShipmentRequest) shipment.ShipmentData {
+func Sent(r acmeserverless.ShipmentRequest) acmeserverless.ShipmentData {
 	log.Printf("Hello, this is %s... We'll take care of your package!", r.Delivery)
 
 	trackingnumber := uuid.Must(uuid.NewV4()).String()
 
-	res := shipment.ShipmentData{
+	res := acmeserverless.ShipmentData{
 		TrackingNumber: trackingnumber,
 		OrderNumber:    r.OrderID,
 		Status:         "shipped - pending delivery",
@@ -32,7 +32,7 @@ func Sent(r shipment.ShipmentRequest) shipment.ShipmentData {
 
 // Delivered takes care of alerting the ACME Serverless Fitness Shop that the order has
 // been delivered to the customer.
-func Delivered(s shipment.ShipmentData) shipment.ShipmentData {
+func Delivered(s acmeserverless.ShipmentData) acmeserverless.ShipmentData {
 	d := deliveryTime(minDeliveryTime, maxDeliveryTime)
 	log.Printf("Simulating delivery by sleeping for %d seconds", d)
 
