@@ -39,7 +39,7 @@ config:
     version: 0.1.0 ## The version
 ```
 
-To create the Pulumi stack, and create the Payment service, run `pulumi up`.
+To create the Pulumi stack, and create the shipment service, run `pulumi up`.
 
 If you want to keep track of the resources in Pulumi, you can add tags to your stack as well.
 
@@ -113,20 +113,19 @@ docker push gcr.io/[PROJECT-ID]/shipment:$VERSION
 The container relies on the environment variables:
 
 * SENTRY_DSN: The DSN to connect to Sentry
-* K_SERVICE: The name of the service (in Google Cloud Run this variable is automatically set)
-* VERSION: The version you're running
+* K_SERVICE: The name of the service (in Google Cloud Run this variable is automatically set, defaults to `shipment` if not set)
+* VERSION: The version you're running (will default to `dev` if not set)
+* PORT: The port number the service will listen on (will default to `8080` if not set)
 * STAGE: The environment in which you're running
-* ORDER_URL: The URL of the Order service to send back tracking information
-* WAVEFRONT_URL: The URL to connect to Wavefront
 * WAVEFRONT_TOKEN: The token to connect to Wavefront
+* WAVEFRONT_URL: The URL to connect to Wavefront (will default to `debug` if not set)
 
 A `docker run`, with all options, is:
 
 ```bash
-docker run --rm -it -p 8080:8080 -e SENTRY_DSN=abcd -e K_SERVICE=Payment \
-  -e VERSION=$VERSION -e STAGE=dev -e ORDER_URL=http://order.acme.com \
-  -e WAVEFRONT_URL=https://my-url.wavefront.com \
-  -e WAVEFRONT_TOKEN=efgh gcr.io/[PROJECT-ID]/shipment:$VERSION
+docker run --rm -it -p 8080:8080 -e SENTRY_DSN=abcd -e K_SERVICE=shipment \
+  -e VERSION=$VERSION -e PORT=8080 -e STAGE=dev -e WAVEFRONT_URL=https://my-url.wavefront.com \
+  -e WAVEFRONT_TOKEN=efgh -e gcr.io/[PROJECT-ID]/shipment:$VERSION
 ```
 
 Replace `[PROJECT-ID]` with your Google Cloud project ID
