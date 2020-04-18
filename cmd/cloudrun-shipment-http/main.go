@@ -98,7 +98,7 @@ func main() {
 	router.GlobalOPTIONS = CORSHandler
 
 	// Add routes to the router
-	router.POST("/", cfg.WrapFastHTTPRequest(sentryHandler.Handle(SendShipment)))
+	router.POST("/ship", cfg.WrapFastHTTPRequest(sentryHandler.Handle(SendShipment)))
 
 	// Start the server
 	log.Printf("successfully started %s server", servicename)

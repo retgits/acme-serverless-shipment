@@ -43,7 +43,7 @@ func handler(request events.SQSEvent) error {
 	// Send a breadcrumb to Sentry with the shipment request
 	sentry.AddBreadcrumb(&sentry.Breadcrumb{
 		Category:  acmeserverless.ShipmentRequestedEventName,
-		Timestamp: time.Now().Unix(),
+		Timestamp: time.Now(),
 		Level:     sentry.LevelInfo,
 		Data:      acmeserverless.ToSentryMap(req.Data),
 	})
@@ -63,7 +63,7 @@ func handler(request events.SQSEvent) error {
 	// Send a breadcrumb to Sentry with the shipment status
 	sentry.AddBreadcrumb(&sentry.Breadcrumb{
 		Category:  acmeserverless.ShipmentSentEventName,
-		Timestamp: time.Now().Unix(),
+		Timestamp: time.Now(),
 		Level:     sentry.LevelInfo,
 		Data:      acmeserverless.ToSentryMap(evt.Data),
 	})
@@ -92,7 +92,7 @@ func handler(request events.SQSEvent) error {
 	// Send a breadcrumb to Sentry with the shipment status
 	sentry.AddBreadcrumb(&sentry.Breadcrumb{
 		Category:  acmeserverless.ShipmentDeliveredEventName,
-		Timestamp: time.Now().Unix(),
+		Timestamp: time.Now(),
 		Level:     sentry.LevelInfo,
 		Data:      acmeserverless.ToSentryMap(evt.Data),
 	})
