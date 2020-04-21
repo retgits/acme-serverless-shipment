@@ -98,6 +98,8 @@ func handleDelivery(shipmentData acmeserverless.ShipmentData) {
 	}
 
 	req.Header.Add("content-type", "application/json")
+	req.Header.Add("host", os.Getenv("ORDER_HOST"))
+
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Printf("error sending order status: %s", err.Error())
